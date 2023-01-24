@@ -1,5 +1,12 @@
 {% extends "layout.html" %}
 
 {% block body %}
-    <h1>Hello, world</h1>
+<h2 class="container d-flex justify-content-center">Compare</h2>
+<div class="container d-flex justify-content-center">
+<form action="/compare">
+    <input name="u1" autofocus type="text" placeholder="Kamiltonii" value="Kamiltonii">
+    <input name="u2" type="text" placeholder="Xerx105" value="Xerx105">
+    <button type="submit">compare</button>
+</form>
+</div>
 {% endblock %}
