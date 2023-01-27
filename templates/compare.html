@@ -13,8 +13,11 @@
     }
 
     .avatar-small {
-        width: 150px;
-        border-radius: 60%;
+        object-fit: cover;
+        width: 130px;
+        height: 130px;
+        padding:0px;
+        border-radius: 50%;
     }
 
     .rounded {
@@ -23,6 +26,10 @@
 
     .big-text {
         scale: 400%;
+    }
+    .nickname {
+        text-overflow: ellipsis;
+        overflow: hidden;
     }
 </style>
 
@@ -35,7 +42,7 @@
             <div class="col-2">
 
                 <div class="row text-center text-wrap">
-                    <h4>{{data['u1']['name']}}</h4>
+                    <h5 class="nickname" title="{{data['u1']['name']    }}">{{data['u1']['name']}}</h5>
                 </div>
 
                 <div class="row d-flex justify-content-center">
@@ -109,8 +116,8 @@
 
             <div class="col-2">
 
-                <div class="row text-center text-break">
-                    <h4>{{data['u2']['name']}}</h4>
+                <div class="row text-center">
+                    <h5 class="nickname" title="{{data['u2']['name']}}">{{data['u2']['name']}}</h5>
                 </div>
 
                 <div class="row d-flex justify-content-center">
@@ -211,9 +218,9 @@
         {% if data['common_favs']['studios'] %}
         <h5 class="row d-flex justify-content-center">Common favourite studios</h5>
         <div class="row d-flex justify-content-center text-center">
-            <ul>
+            <ul class="list-inline mx-auto justify-content-center">
                 {% for fav in data['common_favs']['studios'] %}
-                <li>{{fav['name']}}</li>
+                <li class="list-inline-item">{{fav['name']}}</li>
                 {% endfor %}
             </ul>
         </div>
