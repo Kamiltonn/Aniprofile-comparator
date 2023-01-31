@@ -20,7 +20,7 @@ def retrieve_data(nickname):
     receives user nickname and returns user data from anilist API
     '''
     query = '''
-  query ($userName: String, $type: MediaType) {
+      query ($userName: String, $type: MediaType) {
     MediaListCollection(userName: $userName, type: $type) {
       lists {
         name
@@ -38,6 +38,11 @@ def retrieve_data(nickname):
         }
         statistics{
           anime{
+            releaseYears {
+              releaseYear
+              count
+              minutesWatched
+              }
             genres{
               genre count
               }
@@ -228,18 +233,9 @@ def get_data_from_json(json_content):
 
 def get_insights(df1, df2, u1, u2):
     '''
-    Retrieves data and relevant media lists from dataframes
-    Statistics:
-    -List Overlap
-    -Match percent (overlap times score difference)
-    -Genres comparison
-    -Top 3 biggest time wasters
-    -common watching and planning to watch
-    -top5 highest common scores
-    TODO:
-    -list of highest and lowest common rated shows if scoring is of the same type:
+    Recieves user  entries list dataframe and user information
+    Responsible for creating dictionary with relevant user data
     '''
-
     # completion statistics
     u1['total'] = df1.shape[0]
     u1['completed'] = df1[df1['status'] == "COMPLETED"].shape[0]
@@ -285,7 +281,6 @@ def get_insights(df1, df2, u1, u2):
                    'studios': get_common_entries_list(u1['favourites']['studios'], u2['favourites']['studios']),
                    'characters': get_common_entries_list(u1['favourites']['characters'], u2['favourites']['characters'])
                    }
-    print(common_favs)
 
     # Calculate time spent on each series
     df1.fillna(0, inplace=True)
@@ -311,10 +306,6 @@ def get_insights(df1, df2, u1, u2):
     u2_top5_time_spent.time_spent = u2_top5_time_spent.time_spent.astype('int').apply(
         lambda x: '{:02d}h:{:02d}m'.format(*divmod(x, 60)))
 
-    #common_time_spent = u1_top5_time_spent.merge(u2_top5_time_spent,how="inner",on="mediaId")
-    #common_media_id = common_time_spent['mediaId'].values.tolist()
-    # print(u1,u2)
-
     # Top7 genres per user
     genres = pd.DataFrame(u1['statistics']['anime']['genres'])
     genres.sort_values(by='count', inplace=True, ascending=False)
@@ -328,10 +319,61 @@ def get_insights(df1, df2, u1, u2):
     genres = genres.to_dict('records')
     u2['statistics']['anime']['genres'] = genres
 
+    # entries count and time watched by release year
+    # ry-releaseYear c-count m-minutesWatched
+    ry1 = pd.DataFrame(u1['statistics']['anime']['releaseYears'])
+    ry2 = pd.DataFrame(u2['statistics']['anime']['releaseYears'])
+
+    ry1.sort_values(by='count', inplace=True, ascending=False)
+    ry2.sort_values(by='count', inplace=True, ascending=False)
+
+    labels_c = set(ry1['releaseYear'][:5].to_list())
+    labels_c.update(ry2['releaseYear'][:5].to_list())
+
+    ry1.sort_values(by='minutesWatched', inplace=True, ascending=False)
+    ry2.sort_values(by='minutesWatched', inplace=True, ascending=False)
+
+    labels_m = set(ry1['releaseYear'][:5].to_list())
+    labels_m.update(ry2['releaseYear'][:5].to_list())
+
+    u1_ryc = ry1[ry1['releaseYear'].isin(labels_c)].drop(columns=['minutesWatched'])
+    u2_ryc = ry2[ry2['releaseYear'].isin(labels_c)].drop(columns=['minutesWatched'])
+
+    u1_rym = ry1[ry1['releaseYear'].isin(labels_m)].drop(columns=['count'])
+    u2_rym = ry2[ry2['releaseYear'].isin(labels_m)].drop(columns=['count'])
+
+    # Handling missing values
+    for label in labels_m:
+      if label not in u1_rym['releaseYear'].tolist():
+        new_row = pd.DataFrame({'releaseYear':label,'minutesWatched':0},index=[0])
+        u1_rym = pd.concat([u1_rym, new_row], ignore_index=True)
+      if label not in u2_rym['releaseYear'].tolist():
+        new_row = pd.DataFrame({'releaseYear':label,'minutesWatched':0},index=[0])
+        u2_rym = pd.concat([u2_rym,new_row], ignore_index=True)
+               
+    for label in labels_c:
+      if label not in u1_ryc['releaseYear'].tolist():
+        new_row = pd.DataFrame({'releaseYear':label,'count':0},index=[0])
+        u1_ryc = pd.concat([u1_rym, new_row], ignore_index=True)
+      if label not in u2_ryc['releaseYear'].tolist():
+        new_row = pd.DataFrame({'releaseYear':label,'count':0},index=[0])
+        u2_ryc = pd.concat([u1_ryc, new_row], ignore_index=True)
+
+    u1_ryc.sort_values(by='releaseYear',inplace=True)
+    u2_ryc.sort_values(by='releaseYear',inplace=True)
+    u1_rym.sort_values(by='releaseYear',inplace=True)
+    u2_rym.sort_values(by='releaseYear',inplace=True)
+
+    rym = {'labels': sorted(labels_m), 'u1_data': u1_rym['minutesWatched'].tolist(
+    ), 'u2_data': u2_rym['minutesWatched'].tolist()}
+    ryc = {'labels': sorted(labels_c), 'u1_data': u1_ryc['count'].tolist(
+    ), 'u2_data': u2_ryc['count'].tolist()}
+
     data = {'l1': u1_top5_time_spent.to_dict('records'),
             'l2': u2_top5_time_spent.to_dict('records'),
             'overlap': int(overlap*100),
             'u1': u1, 'u2': u2,
+            'ryc':ryc, 'rym': rym,
             'common_favs':common_favs}
 
     return data
