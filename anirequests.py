@@ -427,6 +427,8 @@ def get_entries_table(df1, df2, u1, u2):
     #table_df['cover'] = np.where(~table_df['cover'+suff_1].isnull(),table_df['cover'+suff_1].apply(wrap_img), table_df['cover'+suff_2].apply(wrap_img))
     table_df = table_df[["title", "status" + suff_1,
                          "score" + suff_1, "status"+suff_2, "score"+suff_2]]
+    table_df.loc[table_df["score" + suff_1] == 0, ("score" + suff_1)] = np.NaN
+    table_df.loc[table_df["score" + suff_2] == 0, "score" + suff_2] = np.NaN
     html = table_df.to_html(na_rep="X", escape=False, index=False)
 
     lines = html.split("\n")
