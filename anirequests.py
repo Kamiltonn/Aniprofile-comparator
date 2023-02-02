@@ -8,16 +8,10 @@ import time
 session = CachedSession('anilist_api', backend='sqlite',
                         expire_after=3600, allowable_methods=('GET', 'POST'))
 
-
-def get_content(path):
-    with open(path, "r") as json_f:
-        json_content = json.loads(json_f.read())
-    return json_content
-
-
 def retrieve_data(nickname):
     '''
-    receives user nickname and returns user data from anilist API
+    Receives user nickname
+    Returns user data from anilist API and response code
     '''
     query = '''
       query ($userName: String, $type: MediaType) {
@@ -143,19 +137,16 @@ def retrieve_data(nickname):
   '''
     url = 'https://graphql.anilist.co'
     variables = {"userName": nickname, "type": "ANIME"}
-    print(variables)
     response = session.request(
         "POST", url, json={'query': query, 'variables': variables})
     now = time.ctime(int(time.time()))
-    print(f"Time: {now} / Used Cache: {response.from_cache}")
-    print(response.status_code)
-    return response.json(), response.status_code
 
+    return response.json(), response.status_code
 
 def get_data_from_json(json_content):
     '''
-    receives json content and unwraps neccessary data
-    returns user data dictionary and media list entry dataframe
+    Receives json content and unwraps neccessary data
+    Returns user data dictionary and media list entry dataframe
     '''
     user = json_content['data']['MediaListCollection']['user']
     media_lists = json_content['data']['MediaListCollection']['lists']
@@ -230,13 +221,29 @@ def get_data_from_json(json_content):
 
     return df, user
 
+def get_common_entries_list(frame1, frame2):
+    '''
+    Receives 2 dataframes or lists
+    Returns list of common entries based on id
+    '''
+    # quick cheat to get dataframe from list
+    if type(frame1) != 'pandas.core.frame.DataFrame' or type(frame2) != 'pandas.core.frame.DataFrame':
+        frame1 = pd.DataFrame(frame1)
+        frame2 = pd.DataFrame(frame2)
+    if frame1.empty or frame2.empty:
+        return None
+    common = frame1.merge(frame2, how='inner',
+                          on='id', suffixes=('', '_del'))
+    common.drop(
+        columns=[col for col in common if '_del' in col], inplace=True)
 
-def get_insights(df1, df2, u1, u2):
+    return common.to_dict('records')
+
+def calc_completion_stats(df1, df2, u1, u2):
     '''
-    Recieves user  entries list dataframe and user information
-    Responsible for creating dictionary with relevant user data
+    Receives user data dictionary and entries list
+    Updates passed user data dictionary with completion statistics
     '''
-    # completion statistics
     u1['total'] = df1.shape[0]
     u1['completed'] = df1[df1['status'] == "COMPLETED"].shape[0]
     u1['current'] = df1[df1['status'] == "CURRENT"].shape[0]
@@ -251,38 +258,39 @@ def get_insights(df1, df2, u1, u2):
     u2['hold'] = df2[df2['status'] == "CURRENT"].shape[0]
     u2['planning'] = df2[df2['status'] == "PLANNING"].shape[0]
 
-    # List Overlap
-    df1_cw = df1[(df1['status'] == "COMPLETED") | ( df1['status'] == "CURRENT")]
-    df2_cw = df2[(df2['status'] == "COMPLETED") | ( df2['status'] == "CURRENT")]
-    common = df1_cw.merge(df2_cw, how='inner', on='mediaId', suffixes=('_u1', '_u2'))
-    min_length = min([u1['completed'] + u1['current'], u2['completed'] + u2['current']])
+def get_list_overlap(df1, df2):
+    '''
+    Receives user entries dataframes
+    Returns overlap on completed and current status entries in 1-100 format
+    '''
+    df1_cw = df1[(df1['status'] == "COMPLETED") | (df1['status'] == "CURRENT")]
+    df2_cw = df2[(df2['status'] == "COMPLETED") | (df2['status'] == "CURRENT")]
+    common = df1_cw.merge(df2_cw, how='inner',
+                          on='mediaId', suffixes=('_u1', '_u2'))
+    min_length = min(df1_cw.shape[0], df2_cw.shape[0])
     matches = common.shape[0]
-    overlap = matches/min_length
+    return int(matches/min_length * 100)
 
-    # Common favourites
-    def get_common_entries_list(frame1, frame2):
-        #quick cheat to get dataframe from list
-        if type(frame1) != 'pandas.core.frame.DataFrame' or type(frame2) != 'pandas.core.frame.DataFrame':
-          frame1 = pd.DataFrame(frame1)
-          frame2 = pd.DataFrame(frame2)
-        if frame1.empty or frame2.empty:
-            return None
-        common = frame1.merge(frame2, how='inner',
-                              on='id', suffixes=('', '_del'))
-        common.drop(
-            columns=[col for col in common if '_del' in col], inplace=True)
-        return common.to_dict('records')
-
+def get_common_favourites(u1, u2):
+    '''
+    Receives user data dictionary
+    Returns dictionary of common favourite anime,staff,studios and characters
+    '''
     u1_anime = pd.DataFrame(u1['favourites']['anime'])
     u2_anime = pd.DataFrame(u2['favourites']['anime'])
 
-    common_favs = {'anime': get_common_entries_list(u1['favourites']['anime'], u2['favourites']['anime']),
-                   'staff': get_common_entries_list(u1['favourites']['staff'], u2['favourites']['staff']),
-                   'studios': get_common_entries_list(u1['favourites']['studios'], u2['favourites']['studios']),
-                   'characters': get_common_entries_list(u1['favourites']['characters'], u2['favourites']['characters'])
-                   }
+    return {'anime': get_common_entries_list(u1['favourites']['anime'], u2['favourites']['anime']),
+            'staff': get_common_entries_list(u1['favourites']['staff'], u2['favourites']['staff']),
+            'studios': get_common_entries_list(u1['favourites']['studios'], u2['favourites']['studios']),
+            'characters': get_common_entries_list(u1['favourites']['characters'], u2['favourites']['characters'])
+            }
 
-    # Calculate time spent on each series
+def get_time_spent(df1, df2):
+    '''
+    Receives user entries data frames
+    Returns touple with 2 dataframes containing information about highest time spent on series
+    '''
+    # calculate time spent on each series
     df1.fillna(0, inplace=True)
     df2.fillna(0, inplace=True)
     df1['time_spent'] = df1['progress'] * df1['duration'] + \
@@ -291,22 +299,29 @@ def get_insights(df1, df2, u1, u2):
         df2['repeat'] * df2['episodes'] * df2['duration']
     df1.sort_values(by="time_spent", ascending=False, inplace=True)
     df2.sort_values(by="time_spent", ascending=False, inplace=True)
-    u1_top5_time_spent = df1[:5]
-    u2_top5_time_spent = df2[:5]
+    u1_time_spent = df1[:5]
+    u2_time_spent = df2[:5]
 
     # Drop unnecessary cols
-    u1_top5_time_spent = u1_top5_time_spent.drop(
-        columns=[col for col in u1_top5_time_spent if col not in ["mediaId", "title", "time_spent", "cover"]])
+    u1_time_spent = u1_time_spent.drop(
+        columns=[col for col in u1_time_spent if col not in ["mediaId", "title", "time_spent", "cover"]])
 
-    u2_top5_time_spent = u2_top5_time_spent.drop(
-        columns=[col for col in u2_top5_time_spent if col not in ["mediaId", "title", "time_spent", "cover"]])
+    u2_time_spent = u2_time_spent.drop(
+        columns=[col for col in u2_time_spent if col not in ["mediaId", "title", "time_spent", "cover"]])
 
-    u1_top5_time_spent.time_spent = u1_top5_time_spent.time_spent.astype('int').apply(
+    u1_time_spent.time_spent = u1_time_spent.time_spent.astype('int').apply(
         lambda x: '{:02d}h:{:02d}m'.format(*divmod(x, 60)))
-    u2_top5_time_spent.time_spent = u2_top5_time_spent.time_spent.astype('int').apply(
+    u2_time_spent.time_spent = u2_time_spent.time_spent.astype('int').apply(
         lambda x: '{:02d}h:{:02d}m'.format(*divmod(x, 60)))
 
-    # Top7 genres per user
+    return u1_time_spent.to_dict('records'), u2_time_spent.to_dict('records')
+
+def calc_genres_statistics(u1, u2):
+    '''
+    Receives user data dictionary
+    Updates user data dictionary with sorted genres data
+    '''
+    # 7 highest entries per user
     genres = pd.DataFrame(u1['statistics']['anime']['genres'])
     genres.sort_values(by='count', inplace=True, ascending=False)
     genres = genres[:7]
@@ -319,6 +334,12 @@ def get_insights(df1, df2, u1, u2):
     genres = genres.to_dict('records')
     u2['statistics']['anime']['genres'] = genres
 
+def get_release_year_data(u1,u2):
+    '''
+    Receives user data dictionary
+    Return dictionary with labels representing years
+    and data representing count of entries per year(ryc) or minutes watched per year(rym)
+    '''
     # entries count and time watched by release year
     # ry-releaseYear c-count m-minutesWatched
     ry1 = pd.DataFrame(u1['statistics']['anime']['releaseYears'])
@@ -336,44 +357,64 @@ def get_insights(df1, df2, u1, u2):
     labels_m = set(ry1['releaseYear'][:5].to_list())
     labels_m.update(ry2['releaseYear'][:5].to_list())
 
-    u1_ryc = ry1[ry1['releaseYear'].isin(labels_c)].drop(columns=['minutesWatched'])
-    u2_ryc = ry2[ry2['releaseYear'].isin(labels_c)].drop(columns=['minutesWatched'])
+    u1_ryc = ry1[ry1['releaseYear'].isin(labels_c)].drop(
+        columns=['minutesWatched'])
+    u2_ryc = ry2[ry2['releaseYear'].isin(labels_c)].drop(
+        columns=['minutesWatched'])
 
     u1_rym = ry1[ry1['releaseYear'].isin(labels_m)].drop(columns=['count'])
     u2_rym = ry2[ry2['releaseYear'].isin(labels_m)].drop(columns=['count'])
 
-    # Handling missing values
+    # handling missing values
     for label in labels_m:
-      if label not in u1_rym['releaseYear'].tolist():
-        new_row = pd.DataFrame({'releaseYear':label,'minutesWatched':0},index=[0])
-        u1_rym = pd.concat([u1_rym, new_row], ignore_index=True)
-      if label not in u2_rym['releaseYear'].tolist():
-        new_row = pd.DataFrame({'releaseYear':label,'minutesWatched':0},index=[0])
-        u2_rym = pd.concat([u2_rym,new_row], ignore_index=True)
-               
-    for label in labels_c:
-      if label not in u1_ryc['releaseYear'].tolist():
-        new_row = pd.DataFrame({'releaseYear':label,'count':0},index=[0])
-        u1_ryc = pd.concat([u1_rym, new_row], ignore_index=True)
-      if label not in u2_ryc['releaseYear'].tolist():
-        new_row = pd.DataFrame({'releaseYear':label,'count':0},index=[0])
-        u2_ryc = pd.concat([u1_ryc, new_row], ignore_index=True)
+        if label not in u1_rym['releaseYear'].tolist():
+            new_row = pd.DataFrame(
+                {'releaseYear': label, 'minutesWatched': 0}, index=[0])
+            u1_rym = pd.concat([u1_rym, new_row], ignore_index=True)
+        if label not in u2_rym['releaseYear'].tolist():
+            new_row = pd.DataFrame(
+                {'releaseYear': label, 'minutesWatched': 0}, index=[0])
+            u2_rym = pd.concat([u2_rym, new_row], ignore_index=True)
 
-    u1_ryc.sort_values(by='releaseYear',inplace=True)
-    u2_ryc.sort_values(by='releaseYear',inplace=True)
-    u1_rym.sort_values(by='releaseYear',inplace=True)
-    u2_rym.sort_values(by='releaseYear',inplace=True)
+    for label in labels_c:
+        if label not in u1_ryc['releaseYear'].tolist():
+            new_row = pd.DataFrame(
+                {'releaseYear': label, 'count': 0}, index=[0])
+            u1_ryc = pd.concat([u1_rym, new_row], ignore_index=True)
+        if label not in u2_ryc['releaseYear'].tolist():
+            new_row = pd.DataFrame(
+                {'releaseYear': label, 'count': 0}, index=[0])
+            u2_ryc = pd.concat([u1_ryc, new_row], ignore_index=True)
+
+    u1_ryc.sort_values(by='releaseYear', inplace=True)
+    u2_ryc.sort_values(by='releaseYear', inplace=True)
+    u1_rym.sort_values(by='releaseYear', inplace=True)
+    u2_rym.sort_values(by='releaseYear', inplace=True)
 
     rym = {'labels': sorted(labels_m), 'u1_data': u1_rym['minutesWatched'].tolist(
     ), 'u2_data': u2_rym['minutesWatched'].tolist()}
     ryc = {'labels': sorted(labels_c), 'u1_data': u1_ryc['count'].tolist(
     ), 'u2_data': u2_ryc['count'].tolist()}
 
-    data = {'l1': u1_top5_time_spent.to_dict('records'),
-            'l2': u2_top5_time_spent.to_dict('records'),
-            'overlap': int(overlap*100),
+    return ryc,rym
+
+def get_data(df1, df2, u1, u2):
+    '''
+    Recieves user  entries list dataframe and user information
+    Returns creating dictionary with relevant user data
+    '''
+    calc_completion_stats(df1, df2, u1, u2)
+    calc_genres_statistics(u1,u2)
+    overlap = get_list_overlap(df1, df2)
+    common_favs = get_common_favourites(u1, u2)
+    u1_time_spent, u2_time_spent = get_time_spent(df1, df2)
+    ryc, rym = get_release_year_data(u1,u2)
+
+    data = {'l1': u1_time_spent,
+            'l2': u2_time_spent,
+            'overlap': overlap,
             'u1': u1, 'u2': u2,
-            'ryc':ryc, 'rym': rym,
-            'common_favs':common_favs}
+            'ryc': ryc, 'rym': rym,
+            'common_favs': common_favs}
 
     return data

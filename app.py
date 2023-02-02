@@ -13,7 +13,7 @@ def compare():
     if code_1 == 200 & code_2 == 200:
         df1,u1 = an.get_data_from_json(content1)
         df2,u2 = an.get_data_from_json(content2)
-        data = an.get_insights(df1,df2,u1,u2)
+        data = an.get_data(df1,df2,u1,u2)
         return render_template("compare.html",data=data)
     else:
         return render_template("compare_error.html",data={'code_1':code_1,'code_2':code_2})
