@@ -8,6 +8,7 @@ import time
 session = CachedSession('anilist_api', backend='sqlite',
                         expire_after=3600, allowable_methods=('GET', 'POST'))
 
+
 def retrieve_data(nickname):
     '''
     Receives user nickname
@@ -143,6 +144,7 @@ def retrieve_data(nickname):
 
     return response.json(), response.status_code
 
+
 def get_data_from_json(json_content):
     '''
     Receives json content and unwraps neccessary data
@@ -221,6 +223,7 @@ def get_data_from_json(json_content):
 
     return df, user
 
+
 def get_common_entries_list(frame1, frame2):
     '''
     Receives 2 dataframes or lists
@@ -238,6 +241,7 @@ def get_common_entries_list(frame1, frame2):
         columns=[col for col in common if '_del' in col], inplace=True)
 
     return common.to_dict('records')
+
 
 def calc_completion_stats(df1, df2, u1, u2):
     '''
@@ -258,6 +262,7 @@ def calc_completion_stats(df1, df2, u1, u2):
     u2['hold'] = df2[df2['status'] == "CURRENT"].shape[0]
     u2['planning'] = df2[df2['status'] == "PLANNING"].shape[0]
 
+
 def get_list_overlap(df1, df2):
     '''
     Receives user entries dataframes
@@ -270,6 +275,7 @@ def get_list_overlap(df1, df2):
     min_length = min(df1_cw.shape[0], df2_cw.shape[0])
     matches = common.shape[0]
     return int(matches/min_length * 100)
+
 
 def get_common_favourites(u1, u2):
     '''
@@ -284,6 +290,7 @@ def get_common_favourites(u1, u2):
             'studios': get_common_entries_list(u1['favourites']['studios'], u2['favourites']['studios']),
             'characters': get_common_entries_list(u1['favourites']['characters'], u2['favourites']['characters'])
             }
+
 
 def get_time_spent(df1, df2):
     '''
@@ -316,6 +323,7 @@ def get_time_spent(df1, df2):
 
     return u1_time_spent.to_dict('records'), u2_time_spent.to_dict('records')
 
+
 def calc_genres_statistics(u1, u2):
     '''
     Receives user data dictionary
@@ -334,7 +342,8 @@ def calc_genres_statistics(u1, u2):
     genres = genres.to_dict('records')
     u2['statistics']['anime']['genres'] = genres
 
-def get_release_year_data(u1,u2):
+
+def get_release_year_data(u1, u2):
     '''
     Receives user data dictionary
     Return dictionary with labels representing years
@@ -396,25 +405,61 @@ def get_release_year_data(u1,u2):
     ryc = {'labels': sorted(labels_c), 'u1_data': u1_ryc['count'].tolist(
     ), 'u2_data': u2_ryc['count'].tolist()}
 
-    return ryc,rym
+    return ryc, rym
+
+
+def get_entries_table(df1, df2, u1, u2):
+    '''
+    Receives user entries dataframes
+    Returns html table comparing their entries
+    '''
+    # def wrap_img(link): -currently disabled due to putting a lot unnecessary load on anilist page
+    #    '''
+    #    Turns link into table img element
+    #    '''
+    #    return f'<img src="{link}" class="tableIMG"></img>'
+    suff_1 = " " + u1['name']
+    suff_2 = " " + u2['name']
+    table_df = df1.merge(df2, on='mediaId', how='outer',
+                         suffixes=[suff_1, suff_2])
+    table_df['title'] = np.where(
+        ~table_df['title'+suff_1].isnull(), table_df['title'+suff_1], table_df['title'+suff_2])
+    #table_df['cover'] = np.where(~table_df['cover'+suff_1].isnull(),table_df['cover'+suff_1].apply(wrap_img), table_df['cover'+suff_2].apply(wrap_img))
+    table_df = table_df[["title", "status" + suff_1,
+                         "score" + suff_1, "status"+suff_2, "score"+suff_2]]
+    html = table_df.to_html(na_rep="X", escape=False, index=False)
+
+    lines = html.split("\n")
+    lines[2] = '<tr>'
+    lines[0] = '<table class="table table-dark table-hover"'
+    lines.insert(1, 'data-toggle="table"')
+    lines.insert(2, 'data-search="true"')
+    lines.insert(3, 'data-show-columns="true"')
+    lines.insert(4, 'data-pagination="true"')
+    lines.insert(5, 'data-show-pagination-switch="true">')
+    html = "\n".join(lines)
+
+    return html
 
 def get_data(df1, df2, u1, u2):
     '''
-    Recieves user  entries list dataframe and user information
+    Recieves user entries list dataframe and user information
     Returns creating dictionary with relevant user data
     '''
     calc_completion_stats(df1, df2, u1, u2)
-    calc_genres_statistics(u1,u2)
+    calc_genres_statistics(u1, u2)
     overlap = get_list_overlap(df1, df2)
     common_favs = get_common_favourites(u1, u2)
     u1_time_spent, u2_time_spent = get_time_spent(df1, df2)
-    ryc, rym = get_release_year_data(u1,u2)
+    ryc, rym = get_release_year_data(u1, u2)
+    table = get_entries_table(df1, df2, u1, u2)
 
     data = {'l1': u1_time_spent,
             'l2': u2_time_spent,
             'overlap': overlap,
             'u1': u1, 'u2': u2,
             'ryc': ryc, 'rym': rym,
-            'common_favs': common_favs}
+            'common_favs': common_favs,
+            'table': table}
 
     return data
