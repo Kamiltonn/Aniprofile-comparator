@@ -2,10 +2,10 @@
 
 {% block body %}
 <style>
-    .tableIMG {
+    .coverIMG {
         object-fit: cover;
-        height: 3vw;
-        width: 2vw;
+        width:100%;
+        height:7vw;
     }
 
     .maxWidth {
@@ -35,6 +35,10 @@
 
     .hidden {
         display: none !important;
+    }
+    
+    .col-2-4 {
+        width: 20% !important;
     }
 </style>
 
@@ -135,38 +139,46 @@
 
 
     <h4 class="row justify-content-center">Time spent by series</h4>
+    <div class="row justify-content-center">
 
-    <div class="row justify-content-center mb-2">
-
-        <div class="col-auto">
-            <div class="row">
-                <table class="table-responsive-md table-dark table-sm text-wrap">
-                    {% for media in data['l1']%}
-                    <tr>
-                        <th><img src={{media["cover"]}} class="img-fluid rounded tableIMG"></th>
-                        <th>{{media['title']}}</th>
-                        <th>{{media['time_spent']}}</th>
-                    </tr>
-                    {% endfor %}
-                </table>
+        <div class="col-4">
+            <div class="row justify-content-center text-wrap mb-1">
+            {% for media in data['l1']%}
+                <div class="col col-2-4 p-0 mx-1">
+                    <img src={{media["cover"]}} class="img-fluid rounded coverIMG", title="{{media['title']}}">
+                </div>
+            {% endfor %}
+            </div>
+            <div class="row justify-content-center text-wrap text-center mb-1", style="word-wrap: break-word;">
+            {% for media in data['l1']%}
+            <div class="col col-2-4 p-0 mx-1">
+                <small>{{media['time_spent']}}</small>
+            </div>
+            {% endfor %}
             </div>
         </div>
 
-        <div class="col-auto">
-            <div class="row">
-                <table class="table-responsive-md table-dark table-sm text-wrap">
-                    {% for media in data['l2']%}
-                    <tr>
-                        <th>{{media['time_spent']}}</th>
-                        <th>{{media['title']}}</th>
-                        <th><img src={{media["cover"]}} class="img-fluid rounded tableIMG"></th>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
+        <div style="width:4%">
+            <!-- DIVIDER-->
         </div>
 
+        <div class="col-4">
+            <div class="row justify-content-center text-wrap mb-1">
+            {% for media in data['l2']%}
+                <div class="col col-2-4 p-0 mx-1">
+                    <img src={{media["cover"]}} class="img-fluid rounded coverIMG" title="{{media['title']}}">
+                </div>
+            {% endfor %}
+            </div>
+            <div class="row justify-content-center text-wrap text-center mb-1", style="word-wrap: break-word;">
+            {% for media in data['l2']%}
+            <div class="col col-2-4 p-0 mx-1"><small>{{media['time_spent']}}</small></div>
+            {% endfor %}
+            </div>
+        </div>
+        
     </div>
+    
 
     <h4 class="row justify-content-center">Entries by genre</h4>
 

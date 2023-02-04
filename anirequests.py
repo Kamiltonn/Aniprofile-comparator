@@ -221,6 +221,9 @@ def get_data_from_json(json_content):
     df = pd.DataFrame(entries, columns=['mediaId', 'title', 'genres', 'progress',
                       'repeat', 'episodes', 'type', 'duration', 'score', 'status', 'cover'])
 
+    #Certain users have custom lists with overlapping entries - we have to remove them
+    df.drop_duplicates(subset='mediaId', inplace=True)
+
     return df, user
 
 
@@ -307,7 +310,7 @@ def get_time_spent(df1, df2):
     df1.sort_values(by="time_spent", ascending=False, inplace=True)
     df2.sort_values(by="time_spent", ascending=False, inplace=True)
     u1_time_spent = df1[:5]
-    u2_time_spent = df2[:5]
+    u2_time_spent = df2[:5].sort_values(by="time_spent")
 
     # Drop unnecessary cols
     u1_time_spent = u1_time_spent.drop(
