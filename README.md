@@ -1,6 +1,6 @@
 # AniProfile Comparator
 
-## [Live Version](http://aniprofile-comparator.herokuapp.com/)
+## [LIVE](http://aniprofile-comparator.herokuapp.com/)
 
 AniProfile Comparator is a Python Flask project that uses the Anilist API (GraphQL) to fetch user's anime statistics  
 and retrieve meaningful insights from the data using pandas. This project allows you to quickly compare user  
