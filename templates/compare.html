@@ -179,7 +179,7 @@
         
     </div>
     
-
+    {% if data['u1']['statistics']['anime']['genres'] is not none and data['u2']['statistics']['anime']['genres'] is not none %}
     <h4 class="row justify-content-center">Entries by genre</h4>
 
     <div class="row d-flex justify-content-center flex-wrap">
@@ -210,6 +210,8 @@
         </div>
 
     </div>
+    {% endif %}
+
 
     {% if data['common_favs']['anime'] %}
     <h4 class="row d-flex justify-content-center">Common favourite anime</h4>
@@ -295,6 +297,7 @@
     }
 </script>
 
+{% if data['u1']['statistics']['anime']['genres'] is not none %}
 <script>
     const ctx = document.getElementById('barchart');
 
@@ -328,7 +331,9 @@
     }
   });
 </script>
+{% endif %}
 
+{% if data['u1']['statistics']['anime']['genres'] is not none %}
 <script>
     const ctx2 = document.getElementById('barchart2');
 
@@ -366,6 +371,7 @@
     }
   });
 </script>
+{% endif %}
 
 <script>
     const ctx3 = document.getElementById('barchart3');

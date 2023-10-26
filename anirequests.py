@@ -452,11 +452,19 @@ def get_data(df1, df2, u1, u2):
     Returns creating dictionary with relevant user data
     '''
     calc_completion_stats(df1, df2, u1, u2)
-    calc_genres_statistics(u1, u2)
+    if(len(u1['statistics']['anime']['genres']) & len(u2['statistics']['anime']['genres'])):
+      calc_genres_statistics(u1, u2)
+    else:
+        u1['statistics']['anime']['genres'] = None
+        u2['statistics']['anime']['genres'] = None
     overlap = get_list_overlap(df1, df2)
     common_favs = get_common_favourites(u1, u2)
     u1_time_spent, u2_time_spent = get_time_spent(df1, df2)
-    ryc, rym = get_release_year_data(u1, u2)
+    if(len(u1['statistics']['anime']['releaseYears']) & len(u2['statistics']['anime']['releaseYears'])):
+      ryc, rym = get_release_year_data(u1, u2)
+    else:
+      ryc = None
+      rym = None
     table = get_entries_table(df1, df2, u1, u2)
 
     data = {'l1': u1_time_spent,
